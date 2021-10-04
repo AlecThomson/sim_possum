@@ -128,6 +128,4 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-*.csv
 dask-worker-space/
-data/band_1_and_2_sim_cat.csv
