@@ -16,6 +16,7 @@ import dask
 from dask.distributed import Client, LocalCluster
 import time
 import dask.dataframe as dd
+from IPython import embed
 
 np.random.seed(21092)
 
@@ -58,7 +59,7 @@ def get_cat(cat):
     # good_cat = skads[snr_idx][idxs]
     good_cat = skads[snr_idx]
     df = good_cat.to_pandas()
-    df_dask = dd.from_pandas(df, npartitions=30)
+    df_dask = dd.from_pandas(df, chunksize=1000)
     return df_dask, skads_freqs
 
 
@@ -110,7 +111,7 @@ def get_band(band):
     data = {
         "band_2": {
             "freqs": np.linspace(1296e6, 1440e6, 144),
-            "sens": 28e-6 * np.sqrt(288),
+            "sens": 28e-6 * np.sqrt(144),
         },
         "band_1": {
             "freqs": np.linspace(800e6, 1087e6, 288),
@@ -118,7 +119,7 @@ def get_band(band):
         },
         "split_band": {
             "freqs": np.hstack(
-                [np.linspace(800e6, 944e6, 144), np.linspace(1296e6, 1440e6, 144)]
+                [np.linspace(840e6, 984e6, 144), np.linspace(1296e6, 1440e6, 144)]
             ),
             "sens": 22e-6 * np.sqrt(288),
         },
@@ -126,7 +127,7 @@ def get_band(band):
             "freqs": np.hstack(
                 [np.linspace(800e6, 1087e6, 288), np.linspace(1296e6, 1440e6, 144)]
             ),
-            "sens": 19e-6 * np.sqrt(288),
+            "sens": 19e-6 * np.sqrt(432),
         },
     }
     return data[band]["freqs"], data[band]["sens"]
@@ -177,15 +178,15 @@ rmsynth = dask.delayed(do_RMsynth_1D.run_rmsynth, nout=2)
 rmclean = dask.delayed(do_RMclean_1D.run_rmclean, nout=2)
 
 
-def main():
+def main(skads):
     np.random.seed(21092)
-    cluster = LocalCluster(n_workers=31, threads_per_worker=1)
+    cluster = LocalCluster(n_workers=32, threads_per_worker=2)
     # cluster = LocalCluster()
     print(cluster)
     client = Client(cluster)
     print(client)
     good_cat, skads_freqs = get_cat(
-        "/scratch/tho822/master_possum_catalogue_trim10x10deg.dat"
+        skads
     )
     phases, sigma_rms = get_rm_props(good_cat)
     for band in ["band_2", "band_1", "split_band", "band_1_and_2"]:
@@ -220,5 +221,31 @@ def main():
         tab.write(f"{band}_sim_cat.csv", format='pandas.csv')
 
 
+def cli():
+    import argparse
+    # Help string to be shown using the -h option
+
+    descStr = f"""
+    Simulate POSSUM observations for RASSP.
+    """
+
+    # Parse the command line options
+    parser = argparse.ArgumentParser(
+        description=descStr, formatter_class=argparse.RawTextHelpFormatter
+    )
+
+    parser.add_argument(
+        "skads",
+        metavar="skads",
+        type=str,
+        help="Catalogue containing SKADS data.",
+    )
+
+    args = parser.parse_args()
+    
+    main(
+        skads=args.skads
+    )
+
 if __name__ == "__main__":
-    main()
+    cli()
